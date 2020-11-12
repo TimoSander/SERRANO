@@ -1,0 +1,116 @@
+---
+title: "Full-Text Screening Reconciliation"
+author: Emma Wilson
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r project details, include=FALSE}
+projectName <- "Systematic Review and Meta-Analysis of reporting on quality control standards and phenotypes of the basic cell model in brain cancer research: how reproducible is the field?" # Copied and pasted from SyRF
+downloadDate <- "12 Nov 2020" # Date data was downloaded from SyRF
+```
+
+## Aims
+
+This systematic review project utilised both title/abstract and full-text screening to identify relevant studies. The following code:
+
+1. **Reads in** annotation from SyRF database
+2. **Filters** relevant screening question
+3. **Compares** Reviewer 1 and Reviewer 2 answers
+4. **Outputs** file to reconcile disagreements
+
+## 1. Load R Packages
+
+```{r load libraries, message=FALSE}
+library(dplyr)      # Data transformation
+library(readr)      # Reads in data
+library(tidyr)      # Pivot wider
+```
+
+## 2. Read in SyRF Data
+Data are study level annotations only, from the SyRF project titled *`r projectName`* downloaded on `r downloadDate`.
+
+```{r read data, message=FALSE}
+# Study Level Annotations from SyRF Project
+annotations_studyLevel <- read_csv(file = "data-raw/annotations_studyLevel_20201112.csv")
+# All Studies from SyRF Project
+studyInfo <- read_tsv(file = "data-raw/studyInfo.txt")
+```
+
+
+## 3. Tidy Data
+Remove irrelevant columns from the dataset and pivot wider to allow each study screening answer to be compared.
+
+```{r tidy data}
+# Select Relevant Columns and Rename
+dat <- annotations_studyLevel %>%
+  rename(Relevance = "a1baa93f-6871-4806-816e-aad21f550876_Is this article relevant according to inclusion and exclusion criteria?",
+         Reason = "05f8cae4-1a23-45d0-a11e-12f99c6afd9c_Why is the study not relevant?",
+         Notes = "05f8cae4-1a23-45d0-a11e-12f99c6afd9c_Why is the study not relevant?_Notes") %>%
+  select(StudyIdStr, Investigator, Relevance, Reason, Notes)
+
+# Make Data Wider to Compare
+screeningComparison <- dat %>%
+  pivot_wider(names_from = Investigator,
+              values_from = c("Relevance", "Reason", "Notes"))
+```
+
+## 4. Compare Full-Text Screening Answers
+Create a new column to identify studies where two reviewers agreed or disagreed on whether a study was relevant based on full-text screening.
+
+```{r compare}
+# Mutate Column Using "ifelse"
+screeningComparison <- screeningComparison %>%
+  mutate(Relevance_Match = ifelse(Relevance_Timo == Relevance_joly, TRUE, FALSE)) %>%
+  select(StudyIdStr, Relevance_Timo, Relevance_joly, Relevance_Match, Reason_Timo, Reason_joly, Notes_Timo, Notes_joly) # reorder the columns
+```
+
+```{r analyse, include=FALSE}
+nTotal <- sum(nrow(screeningComparison))
+nMatched <- sum(screeningComparison$Relevance_Match == TRUE)
+nDifferent <- sum(screeningComparison$Relevance_Match == FALSE)
+```
+
+Out of a **total `r nTotal` studies**, dual screened by two independent reviewers matched on **`r nMatched` studies** and disagreed on **`r nDifferent` studies**.
+
+## 5. Output Data
+Output the data in 3 formats:
+
+**1. All studies**
+
+```{r output human readable}
+titles <- annotations_studyLevel %>%
+  select(Title, StudyIdStr) %>%
+  unique()
+
+output <- merge(titles, screeningComparison, by = "StudyIdStr")
+
+write_csv(output, "data-processed/FullTextScreeningAgreement.csv")
+```
+
+**2. Studies with disagreements only**
+
+```{r output disagreements only}
+disagree <- output %>%
+  filter(Relevance_Match == FALSE)
+
+write_csv(disagree, "data-processed/FullTextScreeningAgreement_disagreementsOnly.csv")
+```
+
+**3. Studies with disagreements only (formatted for SyRF upload)**
+
+```{r output syrf}
+# Filter only studies with disagreements from Study Info
+syrf <- studyInfo %>%
+  filter(Keywords %in% disagree$StudyIdStr) # StudyIdStr is in Keywords column
+
+# Format for SyRF
+syrf <- syrf %>%
+  rename(Authors = "First Author Surname") %>%
+  select(Title, Authors, "Publication Name", "Alternate Name", Abstract, Url, "Author Address", Year, DOI, Keywords, "Reference Type", "PDF Relative Path")
+```
+
+The **`r nDifferent` studies** re-uploaded to SyRF can be screened based on full-text by a third reviewer to reconcile disagreements.
