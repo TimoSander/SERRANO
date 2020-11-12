@@ -69,9 +69,9 @@ screeningComparison <- screeningComparison %>%
 ```
 
 ```{r analyse, include=FALSE}
-nTotal <- sum(nrow(screeningComparison))
-nMatched <- sum(screeningComparison$Relevance_Match == TRUE)
-nDifferent <- sum(screeningComparison$Relevance_Match == FALSE)
+nTotal <- sum(nrow(screeningComparison)) # Total number of studies
+nMatched <- sum(screeningComparison$Relevance_Match == TRUE) # Number of studies matching
+nDifferent <- sum(screeningComparison$Relevance_Match == FALSE) # Number of studies with disagreement
 ```
 
 Out of a **total `r nTotal` studies**, dual screened by two independent reviewers matched on **`r nMatched` studies** and disagreed on **`r nDifferent` studies**.
@@ -82,21 +82,26 @@ Output the data in 3 formats:
 **1. All studies**
 
 ```{r output human readable}
+# Get titles and StudyIdStr
 titles <- annotations_studyLevel %>%
   select(Title, StudyIdStr) %>%
   unique()
 
+# Match on StudyIdStr
 output <- merge(titles, screeningComparison, by = "StudyIdStr")
 
+# Write csv
 write_csv(output, "data-processed/FullTextScreeningAgreement.csv")
 ```
 
 **2. Studies with disagreements only**
 
 ```{r output disagreements only}
+# Filter disagreements only
 disagree <- output %>%
   filter(Relevance_Match == FALSE)
 
+# Write csv
 write_csv(disagree, "data-processed/FullTextScreeningAgreement_disagreementsOnly.csv")
 ```
 
@@ -111,6 +116,9 @@ syrf <- studyInfo %>%
 syrf <- syrf %>%
   rename(Authors = "First Author Surname") %>%
   select(Title, Authors, "Publication Name", "Alternate Name", Abstract, Url, "Author Address", Year, DOI, Keywords, "Reference Type", "PDF Relative Path")
+
+# Write csv
+write_csv(syrf, "data-processed/FullTextScreening_forSyRF.csv")
 ```
 
 The **`r nDifferent` studies** re-uploaded to SyRF can be screened based on full-text by a third reviewer to reconcile disagreements.
