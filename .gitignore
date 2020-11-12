@@ -1,0 +1,27 @@
+# R files
+.Rproj.user
+.Rhistory
+.RData
+.Ruserdata
+SERRANO.Rproj
+
+# R Environment Variables
+.Renviron
+
+# html files created by R markdown and README
+*.html
+
+# knitr and R markdown default cache directories
+*_cache/
+/cache/
+
+# Temporary files created by R markdown
+*.utf8.md
+*.knit.md
+
+# Sensitive info
+configure.R
+
+# Data folders
+/data-raw/
+/data-processed/
