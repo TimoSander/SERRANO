@@ -18,10 +18,11 @@ downloadDate <- "12 Nov 2020" # Date data was downloaded from SyRF
 
 This systematic review project utilised both title/abstract and full-text screening to identify relevant studies. The following code:
 
-1. **Reads in** annotation from SyRF database
-2. **Filters** relevant screening question
-3. **Compares** Reviewer 1 and Reviewer 2 answers
-4. **Outputs** file to reconcile disagreements
+1. **Loads** required R packages
+2. **Reads in** annotation from SyRF database
+3. **Filters** relevant screening question
+4. **Compares** Reviewer 1 and Reviewer 2 answers
+5. **Outputs** file to reconcile disagreements
 
 ## 1. Load R Packages
 
