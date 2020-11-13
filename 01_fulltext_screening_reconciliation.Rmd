@@ -52,11 +52,15 @@ dat <- annotations_studyLevel %>%
   rename(Relevance = "a1baa93f-6871-4806-816e-aad21f550876_Is this article relevant according to inclusion and exclusion criteria?",
          Reason = "05f8cae4-1a23-45d0-a11e-12f99c6afd9c_Why is the study not relevant?",
          Notes = "05f8cae4-1a23-45d0-a11e-12f99c6afd9c_Why is the study not relevant?_Notes") %>%
-  select(StudyIdStr, Investigator, Relevance, Reason, Notes)
+  select(StudyIdStr, InvestigatorIdStr, Relevance, Reason, Notes)
+
+#Rename InvestigatorIdStr for Convenience
+dat$InvestigatorIdStr <- gsub("a92f6308-5fb6-4754-a80f-5fcead380da6", "Reviewer1", dat$InvestigatorIdStr)
+dat$InvestigatorIdStr <- gsub("e368d6d0-eeb5-42aa-8aee-4de0c8530da3", "Reviewer2", dat$InvestigatorIdStr)
 
 # Make Data Wider to Compare
 screeningComparison <- dat %>%
-  pivot_wider(names_from = Investigator,
+  pivot_wider(names_from = InvestigatorIdStr,
               values_from = c("Relevance", "Reason", "Notes"))
 ```
 
@@ -66,8 +70,8 @@ Create a new column to identify studies where two reviewers agreed or disagreed 
 ```{r compare}
 # Mutate Column Using "ifelse"
 screeningComparison <- screeningComparison %>%
-  mutate(Relevance_Match = ifelse(Relevance_Timo == Relevance_joly, TRUE, FALSE)) %>%
-  select(StudyIdStr, Relevance_Timo, Relevance_joly, Relevance_Match, Reason_Timo, Reason_joly, Notes_Timo, Notes_joly) # reorder the columns
+  mutate(Relevance_Match = ifelse(Relevance_Reviewer1 == Relevance_Reviewer2, TRUE, FALSE)) %>%
+  select(StudyIdStr, Relevance_Reviewer1, Relevance_Reviewer2, Relevance_Match, Reason_Reviewer1, Reason_Reviewer2, Notes_Reviewer1, Notes_Reviewer2) # reorder the columns
 ```
 
 ```{r analyse, include=FALSE}
