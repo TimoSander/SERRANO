@@ -23,6 +23,9 @@ This systematic review project utilised both title/abstract and full-text screen
 3. **Filters** relevant screening question
 4. **Compares** Reviewer 1 and Reviewer 2 answers
 5. **Outputs** file to reconcile disagreements
+6. **Reads in** reconciled disagreements
+7. **Merges** all screening decisions
+8. **Outputs** final screening decisions
 
 ## 1. Load R Packages
 
@@ -38,11 +41,13 @@ Data are study level annotations only, from the SyRF project titled *`r projectN
 ```{r read data, message=FALSE}
 # Study Level Annotations from SyRF Project
 annotations_studyLevel <- read_csv(file = "data-raw/annotations_studyLevel_20201112.csv")
+
 # All Studies from SyRF Project
 studyInfo <- read_tsv(file = "data-raw/studyInfo.txt")
 ```
 
 *Why does `studyInfo` contain data for 1158 studies but only 665 studies are annotated?*
+<br>
 `studyInfo` contains data from all unique studies from the systematic search, including those excluded in the title and abstract screening phase. Only 665 studies were included in title and abstract screening to progress to full text screening then data annotation.
 
 ## 3. Tidy Data
@@ -55,9 +60,11 @@ annotations_studyLevel <- annotations_studyLevel %>%
          Reason = "05f8cae4-1a23-45d0-a11e-12f99c6afd9c_Why is the study not relevant?",
          Notes = "05f8cae4-1a23-45d0-a11e-12f99c6afd9c_Why is the study not relevant?_Notes") %>%
   select(StudyIdStr, InvestigatorIdStr, Relevance, Reason, Notes)
+
 #Rename InvestigatorIdStr for Convenience
 annotations_studyLevel$InvestigatorIdStr <- gsub("a92f6308-5fb6-4754-a80f-5fcead380da6", "Reviewer1", annotations_studyLevel$InvestigatorIdStr)
 annotations_studyLevel$InvestigatorIdStr <- gsub("e368d6d0-eeb5-42aa-8aee-4de0c8530da3", "Reviewer2", annotations_studyLevel$InvestigatorIdStr)
+
 # Make Data Wider to Compare
 screeningComparison <- annotations_studyLevel %>%
   pivot_wider(names_from = InvestigatorIdStr,
@@ -100,3 +107,47 @@ write_csv(syrf, "data-processed/FullTextScreening_forSyRF.csv")
 ```
 
 The **`r nDifferent` studies** re-uploaded to SyRF can be screened based on full-text by a third reviewer to reconcile disagreements.
+
+## 6. Read In Reconciled Screening Decisions
+The 54 studies with screening disagreements were reconcile in a separate SyRF project. Due to this, the studyIdStr will be different, so we will match studies together again using titles.
+
+```{r read additional data, message=FALSE}
+# Reconciled screening decisions from separate SyRF Project
+reconciledDecisions <- read_csv("data-raw/screeningReconciliation.csv")
+```
+
+## 7. Merge All Screening Decisions
+
+```{r merge screening}
+# Format matched screening decisions for merging
+matchedDecisions <- screeningComparison %>%
+  filter(Relevance_Match == TRUE) %>% # Filter only where screening decisions agree
+  select(StudyIdStr, Relevance_Reviewer1) %>% # Reviewer 1 and 2 answers match so only need to select one
+  rename(ScreeningDecisions = Relevance_Reviewer1) # Rename for merging
+
+# Format reconciled screening decisions for merging
+reconciledDecisions <- reconciledDecisions %>%
+  merge(syrf, by = "Title") %>% # Merge by title to get StudyIdStr
+  select(Keywords, ScreeningDecisions) %>% # Keywords column contains StudyIdStr
+  rename(StudyIdStr = Keywords) # Rename for merging
+
+allScreeningDecisions <- rbind(matchedDecisions, reconciledDecisions) # Merging this way converts TRUE = 1 and FALSE = 0, so data match
+
+# Convert 1 = Included and 0 = Excluded
+allScreeningDecisions$ScreeningDecisions <- sub("1", "Included", allScreeningDecisions$ScreeningDecisions)
+allScreeningDecisions$ScreeningDecisions <- sub("0", "Excluded", allScreeningDecisions$ScreeningDecisions)
+```
+
+```{r totals, include=FALSE}
+nIncluded <- sum(allScreeningDecisions$ScreeningDecisions == "Included")
+nExcluded <- sum(allScreeningDecisions$ScreeningDecisions == "Excluded")
+```
+
+## 8. Output Final Full Text Screening Decisions
+Out of a **total `r nTotal` studies**, dual screened by two independent reviewers and, where there were disagreements, reconciled by a third, **`r nIncluded` studies were included** and **`r nExcluded` studies were excluded**.
+
+```{r output final}
+# Output all screening decisions
+write_csv(allScreeningDecisions, "data-processed/FullTextScreening_allDecisions.csv")
+```
+
