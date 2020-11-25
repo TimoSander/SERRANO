@@ -42,24 +42,24 @@ annotations_studyLevel <- read_csv(file = "data-raw/annotations_studyLevel_20201
 studyInfo <- read_tsv(file = "data-raw/studyInfo.txt")
 ```
 
+*Why does `studyInfo` contain data for 1158 studies but only 665 studies are annotated?*
+`studyInfo` contains data from all unique studies from the systematic search, including those excluded in the title and abstract screening phase. Only 665 studies were included in title and abstract screening to progress to full text screening then data annotation.
 
 ## 3. Tidy Data
 Remove irrelevant columns from the dataset and pivot wider to allow each study screening answer to be compared.
 
 ```{r tidy data}
 # Select Relevant Columns and Rename
-dat <- annotations_studyLevel %>%
+annotations_studyLevel <- annotations_studyLevel %>%
   rename(Relevance = "a1baa93f-6871-4806-816e-aad21f550876_Is this article relevant according to inclusion and exclusion criteria?",
          Reason = "05f8cae4-1a23-45d0-a11e-12f99c6afd9c_Why is the study not relevant?",
          Notes = "05f8cae4-1a23-45d0-a11e-12f99c6afd9c_Why is the study not relevant?_Notes") %>%
   select(StudyIdStr, InvestigatorIdStr, Relevance, Reason, Notes)
-
 #Rename InvestigatorIdStr for Convenience
-dat$InvestigatorIdStr <- gsub("a92f6308-5fb6-4754-a80f-5fcead380da6", "Reviewer1", dat$InvestigatorIdStr)
-dat$InvestigatorIdStr <- gsub("e368d6d0-eeb5-42aa-8aee-4de0c8530da3", "Reviewer2", dat$InvestigatorIdStr)
-
+annotations_studyLevel$InvestigatorIdStr <- gsub("a92f6308-5fb6-4754-a80f-5fcead380da6", "Reviewer1", annotations_studyLevel$InvestigatorIdStr)
+annotations_studyLevel$InvestigatorIdStr <- gsub("e368d6d0-eeb5-42aa-8aee-4de0c8530da3", "Reviewer2", annotations_studyLevel$InvestigatorIdStr)
 # Make Data Wider to Compare
-screeningComparison <- dat %>%
+screeningComparison <- annotations_studyLevel %>%
   pivot_wider(names_from = InvestigatorIdStr,
               values_from = c("Relevance", "Reason", "Notes"))
 ```
@@ -82,46 +82,18 @@ nDifferent <- sum(screeningComparison$Relevance_Match == FALSE) # Number of stud
 
 Out of a **total `r nTotal` studies**, dual screened by two independent reviewers matched on **`r nMatched` studies** and disagreed on **`r nDifferent` studies**.
 
-## 5. Output Data
-Output the data in 3 formats:
-
-**1. All studies**
-
-```{r output human readable}
-# Get titles and StudyIdStr
-titles <- annotations_studyLevel %>%
-  select(Title, StudyIdStr) %>%
-  unique()
-
-# Match on StudyIdStr
-output <- merge(titles, screeningComparison, by = "StudyIdStr")
-
-# Write csv
-write_csv(output, "data-processed/FullTextScreeningAgreement.csv")
-```
-
-**2. Studies with disagreements only**
-
-```{r output disagreements only}
-# Filter disagreements only
-disagree <- output %>%
-  filter(Relevance_Match == FALSE)
-
-# Write csv
-write_csv(disagree, "data-processed/FullTextScreeningAgreement_disagreementsOnly.csv")
-```
-
-**3. Studies with disagreements only (formatted for SyRF upload)**
+## 5. Output Disagreements for Reupload to SyRF
+Studies reuploaded to SyRF can be screened by a third reviewer to reconcile disagreements.
 
 ```{r output syrf}
-# Filter only studies with disagreements from Study Info
-syrf <- studyInfo %>%
-  filter(Keywords %in% disagree$StudyIdStr) # StudyIdStr is in Keywords column
-
-# Format for SyRF
-syrf <- syrf %>%
-  rename(Authors = "First Author Surname") %>%
-  select(Title, Authors, "Publication Name", "Alternate Name", Abstract, Url, "Author Address", Year, DOI, Keywords, "Reference Type", "PDF Relative Path")
+# Filter only studies with disagreements and merge with studyInfo
+syrf <- screeningComparison %>%
+  filter(Relevance_Match == FALSE) %>% # Filter only studies with disagreements
+  select(StudyIdStr) %>% # StudyIdStr will match with Keywords in studyInfo
+  mutate(Keywords = StudyIdStr) %>% # Mutate column named Keywords to allow merge
+  merge(studyInfo, by = "Keywords") %>% # Merge
+  rename(Authors = "First Author Surname") %>% # Rename for correct parsing into SyRF
+  select(Title, Authors, "Publication Name", "Alternate Name", Abstract, Url, "Author Address", Year, DOI, Keywords, "Reference Type", "PDF Relative Path") # Reorder for correct parsing into SyRF
 
 # Write csv
 write_csv(syrf, "data-processed/FullTextScreening_forSyRF.csv")
