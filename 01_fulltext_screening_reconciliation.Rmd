@@ -111,12 +111,18 @@ The **`r nDifferent` studies** re-uploaded to SyRF can be screened based on full
 ## 6. Read In Reconciled Screening Decisions
 The 54 studies with screening disagreements were reconcile in a separate SyRF project. Due to this, the studyIdStr will be different, so we will match studies together again using titles.
 
+We also have to remove 1 study that is a duplicate of an already included study.
+
 ```{r read additional data, message=FALSE}
 # Reconciled screening decisions from separate SyRF Project
-reconciledDecisions <- read_csv("data-raw/screeningReconciliation.csv")
+reconciledDecisions <- read_csv("data-raw/screeningReconciledDecisions.csv")
+
+# Change 1 duplicate study to excluded
+reconciledDecisions <- within(reconciledDecisions, Decision[Title == "The HIV-derived protein VPR52-96 has antiglioma activity in vitro and in vivo"] <- "Excluded")
 ```
 
 ## 7. Merge All Screening Decisions
+Subset the studies where the full text screening decision matched and reformat the reconciled decisions so all studies can be merged into one dataset along with their final screening decisions.
 
 ```{r merge screening}
 # Format matched screening decisions for merging
@@ -128,14 +134,16 @@ matchedDecisions <- screeningComparison %>%
 # Format reconciled screening decisions for merging
 reconciledDecisions <- reconciledDecisions %>%
   merge(syrf, by = "Title") %>% # Merge by title to get StudyIdStr
-  select(Keywords, ScreeningDecisions) %>% # Keywords column contains StudyIdStr
-  rename(StudyIdStr = Keywords) # Rename for merging
+  select(Keywords, Decision) %>% # Keywords column contains StudyIdStr
+  rename(StudyIdStr = Keywords,
+         ScreeningDecisions = Decision) # Rename for merging
 
-allScreeningDecisions <- rbind(matchedDecisions, reconciledDecisions) # Merging this way converts TRUE = 1 and FALSE = 0, so data match
+#Merge data
+allScreeningDecisions <- rbind(matchedDecisions, reconciledDecisions) 
 
-# Convert 1 = Included and 0 = Excluded
-allScreeningDecisions$ScreeningDecisions <- sub("1", "Included", allScreeningDecisions$ScreeningDecisions)
-allScreeningDecisions$ScreeningDecisions <- sub("0", "Excluded", allScreeningDecisions$ScreeningDecisions)
+# Convert TRUE = Included and FALSE = Excluded
+allScreeningDecisions$ScreeningDecisions <- sub("TRUE", "Included", allScreeningDecisions$ScreeningDecisions)
+allScreeningDecisions$ScreeningDecisions <- sub("FALSE", "Excluded", allScreeningDecisions$ScreeningDecisions)
 ```
 
 ```{r totals, include=FALSE}

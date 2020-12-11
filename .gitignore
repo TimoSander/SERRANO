@@ -25,3 +25,7 @@ configure.R
 # Data folders
 /data-raw/
 /data-processed/
+/data-helpers/
+
+# Functions
+/functions/
